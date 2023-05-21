@@ -1,0 +1,7 @@
+name = "visitor-notifier"
+main = "src/index.ts"
+compatibility_date = "2023-05-21"
+
+[vars]
+EVENT_NAME = ""
+WEBHOOKS_KEY = ""
