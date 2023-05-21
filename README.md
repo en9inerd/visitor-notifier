@@ -1,4 +1,4 @@
-# Visitor Notifier
+# Visitor Notifier based on Cloudflare Workers and IFTTT Webhooks
 
 This Cloudflare Worker sends notifications to website owners about visitor activity. It uses the Fetch API to send data to a specified webhook using the IFTTT Maker Webhooks service.
 
