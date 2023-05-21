@@ -26,6 +26,13 @@ export default {
     const origin = request.headers.get("Origin") ?? "";
     let body: Body;
 
+    if (!isListed(origin, whitelist)) {
+      return new Response(null, {
+        status: 403,
+        statusText: "Forbidden",
+      });
+    }
+
     try {
       body = await request.json();
       if (!validateBody(body)) {
@@ -35,13 +42,6 @@ export default {
       return new Response(null, {
         status: 400,
         statusText: "Bad Request",
-      });
-    }
-
-    if (!isListed(origin, whitelist)) {
-      return new Response(null, {
-        status: 403,
-        statusText: "Forbidden",
       });
     }
 
