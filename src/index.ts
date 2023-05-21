@@ -1,82 +1,111 @@
-interface Env {
-  EVENT_NAME: string;
-  WEBHOOKS_KEY: string;
-}
-
-interface Body {
-  URL: string;
-  "Screen Dimensions": string;
-  Referrer: string;
-  "User Agent": string;
-}
+import { PostBody, Env } from "./interfaces";
+import { isListed, validateBody } from "./utils";
 
 const whitelist: RegExp[] = [/.*/];
-
-function isListed(uri: string, listing: RegExp[]): boolean {
-  return listing.some((m) => !!uri.match(m));
-}
-
-function validateBody(body: Body): boolean {
-  const requiredProps = ["URL", "Screen Dimensions", "Referrer", "User Agent"];
-  return requiredProps.every((prop) => body.hasOwnProperty(prop));
-}
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST,OPTIONS",
+  "Access-Control-Max-Age": "86400",
+};
 
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const origin = request.headers.get("Origin") ?? "";
-    let body: Body;
+  async fetch(request: Request, env: Env) {
+    const apiUrl = `https://maker.ifttt.com/trigger/${env.EVENT_NAME}/with/key/${env.WEBHOOKS_KEY}`;
 
-    if (!isListed(origin, whitelist)) {
+    if (!isListed(request.headers.get("Origin") ?? "", whitelist)) {
       return new Response(null, {
         status: 403,
         statusText: "Forbidden",
       });
     }
 
-    try {
-      body = await request.json();
-      if (!validateBody(body)) {
-        throw new Error("Invalid body");
-      }
-    } catch (e) {
+    if (request.method === "OPTIONS") {
+      return handleOptions(request);
+    } else if (request.method === "POST") {
+      return handlePost(apiUrl, request);
+    } else {
       return new Response(null, {
-        status: 400,
-        statusText: "Bad Request",
+        status: 405,
+        statusText: "Method Not Allowed",
       });
     }
-
-    const requesterIp = request.headers.get("CF-Connecting-IP");
-    const requesterIp6 = request.headers.get("CF-Connecting-IPv6");
-    const requesterInfo = [
-      `IP: ${requesterIp ?? requesterIp6 ?? ""}`,
-      `Country: ${request.cf?.country ?? ""}`,
-      `Datacenter: ${request.cf?.colo ?? ""}`,
-      `URL: ${body.URL}`,
-      `Screen Dimensions: ${body["Screen Dimensions"]}`,
-      `Referrer: ${body.Referrer}`,
-      `User Agent: ${body["User Agent"]}`,
-    ].join("<br>");
-
-    try {
-      await fetch(`https://maker.ifttt.com/trigger/${env.EVENT_NAME}/with/key/${env.WEBHOOKS_KEY}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          value1: requesterInfo,
-        }),
-      });
-    } catch (e) {
-      return new Response(JSON.stringify(e), {
-        status: 500,
-        statusText: "Internal Server Error",
-      });
-    }
-
-    return new Response(null, {
-      status: 200,
-      statusText: "OK",
-    });
   },
 };
+
+async function handlePost(apiUrl: string, request: Request) {
+  let body: PostBody;
+
+  try {
+    body = await request.json();
+    if (!validateBody(body)) {
+      throw new Error("Invalid body");
+    }
+  } catch (e) {
+    return new Response(null, {
+      status: 400,
+      statusText: "Bad Request",
+    });
+  }
+
+  const requesterIp = request.headers.get("CF-Connecting-IP");
+  const requesterIp6 = request.headers.get("CF-Connecting-IPv6");
+  const requesterInfo = [
+    `IP: ${requesterIp ?? requesterIp6 ?? ""}`,
+    `Country: ${request.cf?.country ?? ""}`,
+    `Datacenter: ${request.cf?.colo ?? ""}`,
+    `URL: ${body.URL}`,
+    `Screen Dimensions: ${body["Screen Dimensions"]}`,
+    `Referrer: ${body.Referrer}`,
+    `User Agent: ${body["User Agent"]}`,
+  ].join("<br>");
+
+  try {
+    const fetchOptions = {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Origin": new URL(apiUrl).origin,
+      },
+      body: JSON.stringify({
+        value1: requesterInfo,
+      }),
+    };
+    const response = await fetch(apiUrl, fetchOptions);
+
+    return new Response(null, {
+      status: response.status,
+      headers: {
+        "Access-Control-Allow-Origin": request.headers.get("Origin") ?? "",
+        "Vary": "Origin",
+      },
+    });
+  } catch (e) {
+    return new Response(JSON.stringify(e), {
+      status: 500,
+      statusText: "Internal Server Error",
+    });
+  }
+}
+
+function handleOptions(request: Request) {
+  if (
+    request.headers.get("Origin") !== null &&
+    request.headers.get("Access-Control-Request-Method") !== null &&
+    request.headers.get("Access-Control-Request-Headers") !== null
+  ) {
+    return new Response(null, {
+      headers: {
+        ...corsHeaders,
+        "Access-Control-Allow-Headers": request.headers.get(
+          "Access-Control-Request-Headers"
+        ) ?? "",
+      },
+    });
+  } else {
+    return new Response(null, {
+      headers: {
+        Allow: "POST, OPTIONS",
+      },
+    });
+  }
+}
