@@ -1,6 +1,8 @@
+> :warning: **Attention!** This repository is no longer maintained since IFTTT webhooks are no longer free. You can still use the code as a reference for your own implementation. As an alternative, you can use Node-RED to create a similar workflow, but it will need public ip address.
+
 # Visitor Notifier based on Cloudflare Workers and IFTTT Webhooks
 
-This Cloudflare Worker sends notifications to website owners about visitor activity. It uses the Fetch API to send data to a specified webhook using the IFTTT Maker Webhooks service.
+This Cloudflare Worker sends notifications to website owner about visitor activity. It uses the Fetch API to send data to a specified webhook using the IFTTT Maker Webhooks service.
 
 ## Deployment
 
